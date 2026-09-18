@@ -1,4 +1,10 @@
+<div align="center">
+
 # SynapseGrid.ai — Smart Campus Energy Optimization Challenge
+
+<img src="docs/SynapseGrid.ai.jpeg" alt="SynapseGrid.ai Architecture" width="100%">
+
+</div>
 
 LLM-assisted operator directive interpretation + deterministic energy
 optimization, built for the BUP CSE FEST 2026 preliminary round
@@ -278,3 +284,28 @@ for case in data['cases']:
   `logging` text) if downstream log aggregation is needed.
 - Add a request-level rate limiter / timeout budget around the LLM call so
   a slow provider can't stall the 4-hour round's response budget.
+
+<br>
+
+---
+
+## Team & Contributors
+
+* **Sayem Rahman** ([@SayemR0018](https://github.com/SayemR0018)) — **Team Lead**
+  * Overall system architecture design and project roadmap orchestration.
+  * API contract enforcement, end-to-end integration across ML and optimization modules.
+  * Benchmark evaluation against official competition rubrics, documentation, and presentation walkthrough.
+* **Rabbi Islam Emon** ([@iamrabbiislamemon](https://github.com/iamrabbiislamemon)) — **Initial Codebase & Backend Engineering**
+  * Core repository scaffolding, application layout, and environment configuration management.
+  * FastAPI service initialization (`app/main.py`, `app/routes.py`, `app/schemas.py`).
+  * Initial mathematical formulation setup and baseline endpoint routing.
+* **MD. Redwan Hossain Khan** ([@redwan212](https://github.com/redwan212)) — **ML Model & LLM Directive Interpretation**
+  * LLM provider abstraction layer (`ml/providers.py`) supporting OpenAI, Anthropic, and offline mock engines.
+  * Prompt engineering with Pydantic structured outputs (`ml/prompts.py`) and zero-shot distractor rejection (`no_op`).
+  * Time normalization (start-inclusive, end-exclusive hours) and factor inversion parsing (`ml/normalizer.py`).
+* **Shamiul Riyad** ([@shamiulriyad](https://github.com/shamiulriyad)) — **Docker Deployment & Guardrail Engineering**
+  * Pre-optimization deterministic guardrails (`ml/validator.py`) to eliminate hallucinations and invalid inputs.
+  * Post-optimization schedule verification replayer (`optimizer/final_validator.py`) auditing energy balance and neutrality.
+  * Multi-stage Docker containerization (`Dockerfile`, `docker-compose.yml`), non-root security, and registry publishing.
+
+---
