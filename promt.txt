@@ -1,0 +1,126 @@
+You are building a complete hackathon project: "GridWise LLM", an HTTP API for the
+BUP CSE Fest 2026 Smart Campus Energy Optimization Challenge. The attached problem
+statement PDF is the canonical spec. Read it fully before writing code, and follow it
+exactly where it conflicts with anything below.
+
+## What the service does
+POST /optimize-energy receives a 24-hour energy scenario (demand, solar, tariff per
+hour, battery parameters) plus 1-3 natural-language operator notes. The service must:
+1. Use an LLM (Gemini via the google-genai SDK) to interpret each note into one of six
+   directive types: solar_reduction, minimum_battery_reserve, no_charge_window,
+   no_discharge_window, max_grid_window, no_op.
+2. Validate the LLM output deterministically (guardrails).
+3. Apply the directives to a linear program and solve for the minimum-cost 24-hour
+   schedule.
+4. Return the interpretation and the schedule as JSON matching the response schema in
+   the spec.
+GET /health returns {"status": "ok"} with HTTP 200.
+
+## Tech stack
+Python 3.11, FastAPI, uvicorn, pydantic v2, google-genai, scipy (linprog, method="highs").
+No database. Configuration comes from environment variables only.
+
+## File structure
+app/__init__.py
+app/main.py         - endpoints and HTTP error handling
+app/schemas.py      - pydantic request models and semantic checks
+app/interpreter.py  - LLM note interpretation
+app/pipeline.py     - orchestration, guardrails, response building
+app/optimizer.py    - LP optimizer
+tests/check.py      - replay validator that runs sample cases against a URL
+requirements.txt, Dockerfile, .dockerignore, .gitignore, .env.example, README.md
+
+## Requirements per module
+
+### main.py and schemas.py
+- Parse the raw body manually. Malformed JSON or a non-object body -> 400.
+- Validate with pydantic. Missing fields, wrong types, not exactly 24 hours, 0 or more
+  than 3 notes, empty notes, negative or NaN/Infinity numbers -> 400 (not FastAPI's
+  default 422).
+- Semantic checks -> 422: hours must be exactly 0..23 once each;
+  minimum_energy_kwh <= initial_energy_kwh <= capacity_kwh.
+- Any unexpected error -> 500 with {"error": "internal_error"}. Log the stack trace
+  server-side only. Never return stack traces or environment values.
+- Run the blocking pipeline with run_in_threadpool.
+
+### interpreter.py
+- Send all notes in ONE Gemini call, temperature 0, response_mime_type
+  "application/json", model from env LLM_MODEL (default gemini-2.5-flash).
+- The LLM returns per note: note_index, directive_type, start_hour, end_hour (24-hour,
+  start included, end EXCLUDED, midnight end = 24), value, explanation.
+- The LLM must NOT produce the hours list itself. Code builds it:
+  range(start, end); if end <= start, wrap past midnight; return sorted unique ints.
+- value maps to: factor (solar_reduction, remaining fraction 0..1),
+  minimum_energy_kwh (minimum_battery_reserve), max_grid_kwh (max_grid_window),
+  null for the two window types and no_op.
+- System prompt must include: the six types with meanings; the exclusive end-hour rule
+  with examples ("1 PM to 3 PM" -> 13, 15); factor conversions ("drop to 20%" -> 0.2,
+  "80% reduction" -> 0.2, "one-fifth" -> 0.2, "reduced by 30%" -> 0.7, "half" -> 0.5);
+  the rule that notes about unrelated topics or other days are no_op; a ban on inventing
+  numbers; and few-shot examples covering every type, including the paraphrases from
+  spec section 11.4.
+
+### pipeline.py
+- Call the interpreter with a timeout (env LLM_TIMEOUT_SECONDS, default 20) through a
+  ThreadPoolExecutor. On timeout or exception, treat the result as empty.
+- Guardrails: for each note index 0..N-1, take the matching LLM entry or fall back to
+  no_op. Reject (-> no_op) unknown types, wrong structured_adjustment keys, empty
+  hours, factor outside [0,1], reserve outside [0, capacity], negative or non-finite
+  grid cap.
+- no_op entries: applies=false, structured_adjustment=null. All others: applies=true.
+- Output exactly one entry per note, in note_index order.
+- After optimizing, round plan values to 4 decimals, clamp them to >= 0, and compute
+  total_grid_kwh, total_cost_bdt, and peak_grid_kwh FROM THE ROUNDED PLAN.
+- plan_summary: short text listing the applied directives and the strategy.
+
+### optimizer.py
+- Variables per hour h: g (grid), s (solar used), c (charge), d (discharge),
+  E (energy after the hour). 120 variables total.
+- Equalities: g + s + d - c = demand[h]; E[h] = E[h-1] + c - d with
+  E[-1] = initial_energy; E[23] = initial_energy.
+- Bounds: 0 <= s <= effective_solar[h]; 0 <= c <= max_charge (0 in no_charge hours);
+  0 <= d <= max_discharge (0 in no_discharge hours); g >= 0 with an upper bound of
+  max_grid_kwh in capped hours; reserve[h] <= E <= capacity, where
+  reserve[h] = max(base minimum, any reserve directive for that hour).
+- effective_solar: multiply the original by each applicable factor.
+  Overlapping grid caps: take the min.
+- Objective: minimize sum(tariff[h] * g[h]) + 1e-6 * sum(c + d).
+- Output: net = c - d. net > 1e-7 -> "charge"; net < -1e-7 -> "discharge";
+  otherwise "idle" with battery_kwh = 0. battery_kwh = |net|.
+- If the LP is infeasible, raise an exception (the API returns a controlled 500).
+
+### tests/check.py
+Replay validator that mirrors the judge. For each case in the public sample cases
+JSON: POST to the given base URL, then verify:
+- 24 unique hours
+- battery transitions, bounds, and rate limits
+- solar_used <= effective solar
+- energy balance every hour
+- end-of-day neutrality
+- every directive is obeyed
+- totals match the recalculated values (tolerance 0.01)
+- if the sample file has expected interpretations or costs, compare them too
+Print OK or a list of errors per case.
+
+### Dockerfile
+python:3.11-slim, non-root user, install requirements first for layer caching, and
+CMD: sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}".
+.env and .git go in .dockerignore and .gitignore. .env.example lists GEMINI_API_KEY,
+LLM_MODEL, LLM_TIMEOUT_SECONDS, PORT.
+
+### README.md
+Keep it short and plain: what the service does, architecture flow
+(LLM interpreter -> guardrails -> LP optimizer -> response), how to run locally,
+exact docker build/run/push commands with an explicit version tag, env setup, and
+curl examples for both endpoints.
+
+## Working order
+1. Build the API with stub interpreter/optimizer and confirm /health works.
+2. Build and test the optimizer alone using hand-written directives from the sample
+   cases, with check.py passing.
+3. Build the interpreter and test it on the sample notes plus paraphrases.
+4. Integrate and run check.py on all sample cases.
+5. Build the Docker image and run it locally with --env-file .env.
+
+Keep the code clean and readable, without over-engineering. After each step, tell me
+what you built and how to test it before moving on.

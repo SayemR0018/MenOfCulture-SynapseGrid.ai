@@ -10,8 +10,10 @@ statement:
 """
 from __future__ import annotations
 
+import json
 import logging
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -58,10 +60,77 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
+def _load_example_request() -> dict | None:
+    """Best-effort example for the Swagger "Try it out" box.
+
+    The endpoint takes a raw ``Request`` (not a Pydantic parameter) so it can
+    return a custom 400 on malformed JSON before validation runs -- which
+    means FastAPI has nothing to auto-generate a request-body schema from.
+    ``openapi_extra`` below fills that gap for documentation only; it does
+    not affect how the request is actually parsed or validated.
+    """
+    path = Path(__file__).resolve().parent.parent / "docs" / (
+        "BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json"
+    )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data["cases"][0]["input"]
+    except Exception:
+        return None
+
+
+def _inline_json_schema_refs(schema: dict) -> dict:
+    """Resolves ``$ref: "#/$defs/..."`` in place and drops ``$defs``.
+
+    Swagger UI resolves "#/..." refs relative to the whole OpenAPI document
+    root, not the local schema subtree embedded under ``requestBody`` here --
+    so raw ``model_json_schema()`` output (which keeps its own local
+    ``$defs``) breaks the docs page with "Could not resolve reference".
+    Inlining trades a larger schema for one that works wherever it's placed.
+    """
+    defs = schema.get("$defs", {})
+
+    def resolve(node, seen=frozenset()):
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and ref.startswith("#/$defs/"):
+                name = ref.removeprefix("#/$defs/")
+                if name in seen:
+                    return {}
+                rest = {k: v for k, v in node.items() if k != "$ref"}
+                return {**resolve(defs.get(name, {}), seen | {name}), **rest}
+            return {k: resolve(v, seen) for k, v in node.items() if k != "$defs"}
+        if isinstance(node, list):
+            return [resolve(v, seen) for v in node]
+        return node
+
+    return resolve(schema)
+
+
+_REQUEST_BODY_OPENAPI = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": _inline_json_schema_refs(
+                    OptimizeEnergyRequest.model_json_schema()
+                ),
+                **(
+                    {"example": example}
+                    if (example := _load_example_request()) is not None
+                    else {}
+                ),
+            }
+        },
+    }
+}
+
+
 @router.post(
     "/optimize-energy",
     response_model=OptimizeEnergyResponse,
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    openapi_extra=_REQUEST_BODY_OPENAPI,
 )
 async def optimize_energy(request: Request):
     request_id = str(uuid.uuid4())
@@ -100,12 +169,13 @@ async def optimize_energy(request: Request):
     )
 
     try:
-        directives = _interpreter.interpret(
+        directives = await _interpreter.interpret_async(
             operator_notes=req.operator_notes,
             scenario_context=scenario_context,
             battery_capacity_kwh=req.battery.capacity_kwh,
             request_id=request_id,
             scenario_id=scenario_id,
+            timeout_seconds=_settings.llm_timeout_seconds,
         )
     except Exception as exc:  # noqa: BLE001 - controlled 500, no stack trace leak
         logger.exception(
