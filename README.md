@@ -149,6 +149,17 @@ docker build -t synapsegrid-energy-optimizer .
 docker run --rm -p 8000:8000 --env-file .env synapsegrid-energy-optimizer
 ```
 
+Test it and publish to Docker Hub (replace `<dockerhub-username>` and the
+version tag):
+
+```bash
+curl http://localhost:8000/health        # -> {"status":"ok"}
+
+docker login
+docker tag  synapsegrid-energy-optimizer <dockerhub-username>/synapsegrid-energy-optimizer:1.0.0
+docker push <dockerhub-username>/synapsegrid-energy-optimizer:1.0.0
+```
+
 Then the same `curl` calls from the section above work against
 `http://localhost:8000`. `docker compose up -d` runs it detached;
 `docker compose logs -f` follows the structured request logs described
@@ -160,9 +171,18 @@ Notes:
   is fine for confirming the container runs end-to-end; switch to `openai`
   or `anthropic` with a real key before deploying/submitting, same as the
   non-Docker path.
-- The image was written and sanity-checked by inspection in this
-  environment (no container runtime was available here to actually build
-  it) — build it once locally / in CI before relying on it for submission.
+- The image has been built and run locally: `GET /health` returns
+  `{"status":"ok"}`, `POST /optimize-energy` matches the sample-case cost,
+  it runs as a non-root user, and it honours the `PORT` env var that
+  Render/Railway inject (`docker run -e PORT=9000 -p 9000:9000 ...`). The
+  server binds `0.0.0.0`; no `.env` or secrets are baked into the image, so
+  pass them at run time (`--env-file .env` or the platform's env settings).
+- The Dockerfile deliberately has no `# syntax=docker/dockerfile:1` line: it
+  makes BuildKit download an extra frontend image from Docker Hub first,
+  which can stall on slow networks, and nothing here needs it.
+- If `docker pull python:3.12-slim` itself hangs, that is a Docker Hub /
+  network issue, not the project. Pull through a mirror and re-tag:
+  `docker pull mirror.gcr.io/library/python:3.12-slim && docker tag mirror.gcr.io/library/python:3.12-slim python:3.12-slim`
 - Rebuild after dependency changes (`docker compose up --build`); code-only
   changes under `app/`, `ml/`, `optimizer/` also need a rebuild since the
   image copies source rather than mounting it. For live-reload local dev,
@@ -170,8 +190,13 @@ Notes:
 
 ## How to run tests
 
+`pytest` and `httpx` are test-only and live in `requirements-dev.txt`
+(kept out of `requirements.txt`/the Docker image, which only need runtime
+deps):
+
 ```bash
 source .venv/bin/activate
+pip install -r requirements-dev.txt
 python -m pytest tests/ -v
 ```
 
