@@ -1,9 +1,85 @@
+<div align="center">
+
 # SynapseGrid.ai — Smart Campus Energy Optimization Challenge
+
+<img src="docs/SynapseGrid.ai.jpeg" alt="SynapseGrid.ai Architecture" width="100%">
+
+</div>
 
 LLM-assisted operator directive interpretation + deterministic energy
 optimization, built for the BUP CSE FEST 2026 preliminary round
 ("GridWise" is the organizers' name for this challenge track;
 SynapseGrid.ai is our submission's name for the service implementing it).
+
+
+---
+
+## 🌐 Live Deployment & Interactive Demo
+
+The service is deployed live on Render with automated HTTPS, continuous integration, and OpenAPI Swagger documentation:
+
+* **Interactive API Docs (Swagger UI):** [https://menofculture-synapsegrid-ai.onrender.com/docs](https://menofculture-synapsegrid-ai.onrender.com/docs)
+* **Alternative Documentation (ReDoc):** [https://menofculture-synapsegrid-ai.onrender.com/redoc](https://menofculture-synapsegrid-ai.onrender.com/redoc)
+* **Service Health Check:** [https://menofculture-synapsegrid-ai.onrender.com/health](https://menofculture-synapsegrid-ai.onrender.com/health)
+
+> ⚠️ **Note for Evaluators:** Hosted on Render Cloud. If the instance has been idle, the initial cold start may take ~30–45 seconds to spin up. Subsequent calls execute in under 2 seconds.
+
+---
+
+### Quick Test Options
+
+#### Option 1: Browser via Swagger UI (Zero Setup)
+1. Open [https://menofculture-synapsegrid-ai.onrender.com/docs](https://menofculture-synapsegrid-ai.onrender.com/docs).
+2. Click on **`POST /optimize-energy`** and select **"Try it out"**.
+3. Paste the sample payload provided below into the **Request body** field.
+4. Click **Execute** to view the live optimization results, directive classifications, and cost breakdown.
+
+#### Option 2: Direct cURL via Terminal
+Run this command in any terminal to test the live production API:
+
+```bash
+curl -X POST [https://menofculture-synapsegrid-ai.onrender.com/optimize-energy](https://menofculture-synapsegrid-ai.onrender.com/optimize-energy) \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scenario_id": "LIVE-DEMO-01",
+    "operator_notes": [
+      "Solar output will drop to about 25% from 12:00 to 14:00 due to cleaning.",
+      "Cafeteria menu updates for tomorrow."
+    ],
+    "hours": [
+      {"hour": 0, "demand_kwh": 90, "solar_kwh": 0, "tariff_bdt_per_kwh": 6},
+      {"hour": 1, "demand_kwh": 85, "solar_kwh": 0, "tariff_bdt_per_kwh": 6},
+      {"hour": 2, "demand_kwh": 80, "solar_kwh": 0, "tariff_bdt_per_kwh": 5},
+      {"hour": 3, "demand_kwh": 80, "solar_kwh": 0, "tariff_bdt_per_kwh": 5},
+      {"hour": 4, "demand_kwh": 85, "solar_kwh": 0, "tariff_bdt_per_kwh": 5},
+      {"hour": 5, "demand_kwh": 95, "solar_kwh": 0, "tariff_bdt_per_kwh": 6},
+      {"hour": 6, "demand_kwh": 110, "solar_kwh": 5, "tariff_bdt_per_kwh": 8},
+      {"hour": 7, "demand_kwh": 130, "solar_kwh": 20, "tariff_bdt_per_kwh": 10},
+      {"hour": 8, "demand_kwh": 150, "solar_kwh": 50, "tariff_bdt_per_kwh": 12},
+      {"hour": 9, "demand_kwh": 165, "solar_kwh": 90, "tariff_bdt_per_kwh": 14},
+      {"hour": 10, "demand_kwh": 175, "solar_kwh": 130, "tariff_bdt_per_kwh": 16},
+      {"hour": 11, "demand_kwh": 180, "solar_kwh": 160, "tariff_bdt_per_kwh": 16},
+      {"hour": 12, "demand_kwh": 185, "solar_kwh": 180, "tariff_bdt_per_kwh": 15},
+      {"hour": 13, "demand_kwh": 180, "solar_kwh": 170, "tariff_bdt_per_kwh": 14},
+      {"hour": 14, "demand_kwh": 170, "solar_kwh": 140, "tariff_bdt_per_kwh": 13},
+      {"hour": 15, "demand_kwh": 165, "solar_kwh": 90, "tariff_bdt_per_kwh": 14},
+      {"hour": 16, "demand_kwh": 170, "solar_kwh": 45, "tariff_bdt_per_kwh": 18},
+      {"hour": 17, "demand_kwh": 185, "solar_kwh": 10, "tariff_bdt_per_kwh": 22},
+      {"hour": 18, "demand_kwh": 205, "solar_kwh": 0, "tariff_bdt_per_kwh": 28},
+      {"hour": 19, "demand_kwh": 215, "solar_kwh": 0, "tariff_bdt_per_kwh": 30},
+      {"hour": 20, "demand_kwh": 205, "solar_kwh": 0, "tariff_bdt_per_kwh": 26},
+      {"hour": 21, "demand_kwh": 175, "solar_kwh": 0, "tariff_bdt_per_kwh": 18},
+      {"hour": 22, "demand_kwh": 135, "solar_kwh": 0, "tariff_bdt_per_kwh": 10},
+      {"hour": 23, "demand_kwh": 105, "solar_kwh": 0, "tariff_bdt_per_kwh": 7}
+    ],
+    "battery": {
+      "capacity_kwh": 220,
+      "initial_energy_kwh": 110,
+      "minimum_energy_kwh": 40,
+      "max_charge_kwh_per_hour": 50,
+      "max_discharge_kwh_per_hour": 50
+    }
+  }'
 
 Pipeline (matches the problem statement's architecture exactly):
 
@@ -376,3 +452,31 @@ case entry and not wrapped in another key.
   `logging` text) if downstream log aggregation is needed.
 - Add a request-level rate limiter (the LLM call already has a timeout,
   `LLM_TIMEOUT_SECONDS`).
+
+<br>
+
+---
+
+  ## Team & Contributors
+
+* **Sayem Rahman** ([@SayemR0018](https://github.com/SayemR0018)) — **Team Lead**
+  * Overall system architecture design and project roadmap orchestration.
+  * API contract enforcement, end-to-end integration across ML and optimization modules.
+  * Benchmark evaluation against official competition rubrics, documentation, and presentation walkthrough.
+* **Rabbi Islam Emon** ([@iamrabbiislamemon](https://github.com/iamrabbiislamemon)) — **Initial Codebase & Backend Engineering**
+  * Core repository scaffolding, application layout, and environment configuration management.
+  * FastAPI service initialization (`app/main.py`, `app/routes.py`, `app/schemas.py`).
+  * Initial mathematical formulation setup and baseline endpoint routing.
+* **MD. Redwan Hossain Khan** ([@redwan212](https://github.com/redwan212)) — **ML Model & LLM Directive Interpretation**
+  * LLM provider abstraction layer (`ml/providers.py`) supporting OpenAI, Anthropic, and offline mock engines.
+  * Prompt engineering with Pydantic structured outputs (`ml/prompts.py`) and zero-shot distractor rejection (`no_op`).
+  * Time normalization (start-inclusive, end-exclusive hours) and factor inversion parsing (`ml/normalizer.py`).
+* **Shamiul Riyad** ([@shamiulriyad](https://github.com/shamiulriyad)) — **Docker Deployment & Guardrail Engineering**
+  * Pre-optimization deterministic guardrails (`ml/validator.py`) to eliminate hallucinations and invalid inputs.
+  * Post-optimization schedule verification replayer (`optimizer/final_validator.py`) auditing energy balance and neutrality.
+  * Multi-stage Docker containerization (`Dockerfile`, `docker-compose.yml`), non-root security, and registry publishing.
+
+---
+
+
+  
