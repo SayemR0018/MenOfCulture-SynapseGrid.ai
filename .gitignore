@@ -4,3 +4,9 @@ __pycache__/
 .pytest_cache/
 .env
 *.egg-info/
+promt.txt
+
+# Reference-only PDFs, not read by any code. The sample-cases JSON in this
+# same folder stays tracked -- tests, the Dockerfile, and
+# scripts/evaluate_interpreter.py all depend on it.
+docs/*.pdf

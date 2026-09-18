@@ -58,7 +58,11 @@ def build_scenario_math(
         if d.directive_type == DirectiveType.SOLAR_REDUCTION:
             factor = adj["factor"]
             for h in directive_hours:
-                effective_solar[h] = base_solar[h] * factor
+                # Multiply cumulatively so overlapping solar_reduction
+                # directives on the same hour compound (0.5 and 0.5 -> 0.25),
+                # rather than the later directive overwriting the earlier
+                # one's reduction.
+                effective_solar[h] *= factor
 
         elif d.directive_type == DirectiveType.MINIMUM_BATTERY_RESERVE:
             level = adj["minimum_energy_kwh"]
