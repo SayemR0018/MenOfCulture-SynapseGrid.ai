@@ -5,6 +5,7 @@ __pycache__/
 .env
 *.egg-info/
 promt.txt
+test_case_custom.json
 
 # Reference-only PDFs, not read by any code. The sample-cases JSON in this
 # same folder stays tracked -- tests, the Dockerfile, and

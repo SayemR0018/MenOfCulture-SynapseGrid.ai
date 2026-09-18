@@ -53,9 +53,14 @@ optimizer/      Deterministic math layer (LLM-free)
   optimizer.py      Linear program (scipy/HiGHS) -> hourly_plan
   cost.py           total_grid_kwh / total_cost_bdt / peak_grid_kwh
   final_validator.py  Replays hourly_plan against every SynapseGrid.ai rule
-tests/          pytest suite (65+ tests)
+tests/          pytest suite (68 tests)
 scripts/        scripts/evaluate_interpreter.py — accuracy metrics
-docs/           Canonical problem statement, rubric, and public sample cases
+docs/           Public sample cases JSON (the reference PDFs are kept locally,
+                gitignored, and are not read by any code)
+Dockerfile, docker-compose.yml, .dockerignore   Container build/run setup
+requirements.txt        Runtime dependencies (what the Docker image installs)
+requirements-dev.txt    Adds pytest + httpx for running the tests
+.env.example            All supported environment variables
 ```
 
 ## How the ML pipeline works
@@ -77,7 +82,11 @@ docs/           Canonical problem statement, rubric, and public sample cases
 5. If validation still fails after all retries, the service **fails safe**:
    every note is returned as `no_op` (never a guess, never a crash) unless
    `on_unsafe_fallback="raise"` is configured, in which case a controlled
-   `InterpretationValidationError` propagates instead.
+   `InterpretationValidationError` propagates instead. The same fail-safe
+   applies if the LLM call exceeds `LLM_TIMEOUT_SECONDS` (default 20):
+   `DirectiveInterpreter.interpret_async()` runs the blocking LLM call in a
+   worker thread, so a slow or hung provider neither freezes the server for
+   other requests nor holds a request open indefinitely.
 6. Only now does `optimizer/optimizer.py` run — a linear program (via
    `scipy.optimize.linprog`, HiGHS) with variables `grid`, `solar_used`,
    `charge`, `discharge`, `battery_energy_after` per hour, minimizing
@@ -102,8 +111,13 @@ Copy `.env.example` to `.env` and set:
 MODEL_PROVIDER=openai        # or anthropic, or mock
 MODEL_NAME=gpt-4o-mini        # or e.g. claude-sonnet-5 for anthropic
 API_KEY=sk-...                 # never hard-coded, never committed
-MAX_RETRIES=1
+MAX_RETRIES=1                  # correction retries after a failed validation
+LLM_TIMEOUT_SECONDS=20         # wall-clock budget for the whole LLM step
+LOG_LEVEL=INFO
 ```
+
+`API_BASE_URL` is optional (OpenAI-compatible proxy). `PORT` is read by the
+Docker image (default 8000) and is normally injected by the hosting platform.
 
 - `openai` / `anthropic` use the respective official SDKs with JSON-mode /
   plain text completion and `temperature=0`.
@@ -126,9 +140,21 @@ cp .env.example .env        # then edit MODEL_PROVIDER / MODEL_NAME / API_KEY
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-`GET /health` → `{"status": "ok"}`
-`POST /optimize-energy` → see `app/schemas.py` / Section 07 of the problem
-statement for the exact request shape.
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Liveness check → `{"status": "ok"}` |
+| `POST /optimize-energy` | Main API: scenario + operator notes in, schedule out. See `app/schemas.py` / Section 07 of the problem statement for the request shape |
+| `GET /optimize-energy` | Browser-friendly usage message (browsers send GET; the real endpoint is POST) |
+| `GET /docs` | Swagger UI — paste a scenario, click **Try it out** → **Execute** (pre-filled with a sample case) |
+
+`POST /optimize-energy` status codes: `200` success; `400` malformed JSON or
+an invalid request (missing fields, not exactly 24 distinct hours 0-23, 0 or
+more than 3 notes, battery bounds violated); `422` scenario infeasible under
+the directives; `500` interpretation/optimizer/final-validation failure (no
+stack traces are ever returned).
+
+Open the service in a browser at `http://localhost:8000/docs` — note that
+`0.0.0.0` is only a bind address and cannot be opened in a browser.
 
 ## Running with Docker
 
@@ -188,6 +214,35 @@ Notes:
   image copies source rather than mounting it. For live-reload local dev,
   run `uvicorn app.main:app --reload` outside Docker instead.
 
+## Deploying to Render
+
+Render builds straight from the `Dockerfile` in this GitHub repo.
+
+1. [render.com](https://render.com) → **New +** → **Web Service** → connect
+   the GitHub repo.
+2. **Language:** Docker. **Branch:** the branch that has the latest code.
+   Leave *Root Directory* empty.
+3. **Advanced → Health Check Path:** `/health`.
+4. **Environment Variables** (secrets live here, never in git):
+
+   | Key | Value |
+   |---|---|
+   | `MODEL_PROVIDER` | `openai` (required — `mock` does not satisfy the LLM requirement) |
+   | `API_KEY` | your OpenAI key (required) |
+   | `MODEL_NAME` | `gpt-4o-mini` |
+   | `MAX_RETRIES` | `1` |
+   | `LLM_TIMEOUT_SECONDS` | `20` |
+
+   Do **not** set `PORT` — Render injects it and the image's `CMD` reads it.
+5. **Create Web Service**, wait for "Your service is live", then check
+   `https://<your-service>.onrender.com/health` and
+   `https://<your-service>.onrender.com/docs`.
+
+Free-tier services sleep after ~15 minutes idle and take 30-60 s to wake on
+the next request; use a paid instance (or a periodic `/health` ping) when
+response time matters. Every push to the deployed branch redeploys
+automatically.
+
 ## How to run tests
 
 `pytest` and `httpx` are test-only and live in `requirements-dev.txt`
@@ -200,7 +255,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -v
 ```
 
-All 65+ tests run against the offline `mock` provider (no network/API key
+All 68 tests run against the offline `mock` provider (no network/API key
 needed) and currently pass, including:
 
 - `test_time_parsing.py` / `test_numeric_parsing.py` — start-inclusive/
@@ -253,17 +308,30 @@ curl -s -X POST http://127.0.0.1:8000/optimize-energy \
   }' | python3 -m json.tool
 ```
 
-Or replay the whole public sample pack:
+Or replay the whole public sample pack (`httpx` comes with
+`requirements-dev.txt`; point the URL at a deployed service to test that
+instead):
 
 ```bash
 python3 -c "
-import json, requests
+import json, httpx
 data = json.load(open('docs/BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json'))
 for case in data['cases']:
-    r = requests.post('http://127.0.0.1:8000/optimize-energy', json=case['input'])
-    print(case['id'], r.status_code, r.json()['total_cost_bdt'])
+    r = httpx.post('http://127.0.0.1:8000/optimize-energy', json=case['input'], timeout=60)
+    print(case['id'], r.status_code, r.json()['total_cost_bdt'], 'expected', case['expected_output']['total_cost_bdt'])
 "
 ```
+
+PowerShell (Windows), sending one case from a JSON file:
+
+```powershell
+$body = (Get-Content docs\BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json -Raw | ConvertFrom-Json).cases[0].input | ConvertTo-Json -Depth 10
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/optimize-energy -ContentType "application/json" -Body $body
+```
+
+The request body must be the scenario object itself (`scenario_id`,
+`operator_notes`, `hours`, `battery` at the top level) — not a whole sample
+case entry and not wrapped in another key.
 
 ## Known limitations
 
@@ -281,10 +349,15 @@ for case in data['cases']:
   every occurrence is logged at `WARNING` (`interpretation_fallback`) for
   observability. Set `on_unsafe_fallback="raise"` in `app/routes.py` if a
   hard failure (HTTP 500) is preferred instead.
-- `max_grid_window` directives that overlap in the same hour are combined
-  with `min()` (the tightest cap wins); the problem statement guarantees
-  organizer scenarios won't require contradictory hard directives, so this
-  case shouldn't arise in valid scoring scenarios.
+- Directives of the same type that overlap in an hour are combined as
+  follows: `solar_reduction` factors **multiply** (0.5 and 0.5 give 0.25),
+  `minimum_battery_reserve` takes the **max**, and `max_grid_window` takes
+  the **min** (tightest cap wins). The problem statement guarantees
+  organizer scenarios won't require contradictory hard directives, so
+  contradictory overlaps shouldn't arise in valid scoring scenarios.
+- On timeout the LLM worker thread cannot be forcibly killed (a Python
+  limitation): the request returns promptly with the no_op fallback, but the
+  abandoned provider call finishes in the background.
 - The optimizer solves an exact LP to global optimality (not a heuristic),
   so cost-minimization is provably optimal given the validated directives —
   the only source of suboptimality is misinterpretation upstream.
@@ -301,5 +374,5 @@ for case in data['cases']:
   transformer) if a fully offline fallback for production is ever desired.
 - Add OpenTelemetry-style structured JSON logging (currently plain
   `logging` text) if downstream log aggregation is needed.
-- Add a request-level rate limiter / timeout budget around the LLM call so
-  a slow provider can't stall the 4-hour round's response budget.
+- Add a request-level rate limiter (the LLM call already has a timeout,
+  `LLM_TIMEOUT_SECONDS`).
