@@ -290,34 +290,6 @@ Notes:
   image copies source rather than mounting it. For live-reload local dev,
   run `uvicorn app.main:app --reload` outside Docker instead.
 
-## Deploying to Render
-
-Render builds straight from the `Dockerfile` in this GitHub repo.
-
-1. [render.com](https://render.com) → **New +** → **Web Service** → connect
-   the GitHub repo.
-2. **Language:** Docker. **Branch:** the branch that has the latest code.
-   Leave *Root Directory* empty.
-3. **Advanced → Health Check Path:** `/health`.
-4. **Environment Variables** (secrets live here, never in git):
-
-   | Key | Value |
-   |---|---|
-   | `MODEL_PROVIDER` | `openai` (required — `mock` does not satisfy the LLM requirement) |
-   | `API_KEY` | your OpenAI key (required) |
-   | `MODEL_NAME` | `gpt-4o-mini` |
-   | `MAX_RETRIES` | `1` |
-   | `LLM_TIMEOUT_SECONDS` | `20` |
-
-   Do **not** set `PORT` — Render injects it and the image's `CMD` reads it.
-5. **Create Web Service**, wait for "Your service is live", then check
-   `https://<your-service>.onrender.com/health` and
-   `https://<your-service>.onrender.com/docs`.
-
-Free-tier services sleep after ~15 minutes idle and take 30-60 s to wake on
-the next request; use a paid instance (or a periodic `/health` ping) when
-response time matters. Every push to the deployed branch redeploys
-automatically.
 
 ## How to run tests
 
