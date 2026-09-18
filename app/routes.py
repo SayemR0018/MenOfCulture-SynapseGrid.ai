@@ -60,6 +60,18 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok")
 
 
+@router.get("/optimize-energy", include_in_schema=False)
+def optimize_energy_usage() -> dict:
+    # Browsers issue GET; without this they only see "Method Not Allowed".
+    return {
+        "endpoint": "/optimize-energy",
+        "method": "POST",
+        "message": "This endpoint accepts POST with a JSON body. Open /docs to try it in the browser.",
+        "docs": "/docs",
+        "required_fields": ["scenario_id", "operator_notes", "hours", "battery"],
+    }
+
+
 def _load_example_request() -> dict | None:
     """Best-effort example for the Swagger "Try it out" box.
 
