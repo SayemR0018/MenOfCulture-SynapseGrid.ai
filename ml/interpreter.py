@@ -9,6 +9,8 @@ only returns validated ``DirectiveInterpretation`` objects.
 """
 from __future__ import annotations
 
+import asyncio
+import functools
 import json
 import logging
 
@@ -57,7 +59,7 @@ def _parse_llm_json(raw_text: str) -> list[dict]:
     raise LLMOutputParseError("LLM output JSON is neither an object nor an array")
 
 
-def _safe_fallback(num_notes: int) -> list[DirectiveInterpretation]:
+def safe_fallback(num_notes: int) -> list[DirectiveInterpretation]:
     """The controlled failure path: every note becomes no_op.
 
     Used only after retries are exhausted, so the API never crashes or
@@ -176,7 +178,50 @@ class DirectiveInterpreter:
             "interpretation_fallback request_id=%s scenario_id=%s errors=%s",
             request_id, scenario_id, last_result.errors if last_result else [],
         )
-        return _safe_fallback(num_notes)
+        return safe_fallback(num_notes)
+
+    async def interpret_async(
+        self,
+        operator_notes: list[str],
+        scenario_context: ScenarioContext | None = None,
+        battery_capacity_kwh: float | None = None,
+        request_id: str | None = None,
+        scenario_id: str | None = None,
+        timeout_seconds: float = 20,
+    ) -> list[DirectiveInterpretation]:
+        """Runs the blocking ``interpret`` call off the event loop, bounded
+        by ``timeout_seconds``. On timeout, follows ``on_unsafe_fallback``
+        the same way an exhausted-retries validation failure does.
+        """
+        num_notes = len(operator_notes)
+        if num_notes == 0:
+            return []
+
+        loop = asyncio.get_running_loop()
+        call = functools.partial(
+            self.interpret,
+            operator_notes=operator_notes,
+            scenario_context=scenario_context,
+            battery_capacity_kwh=battery_capacity_kwh,
+            request_id=request_id,
+            scenario_id=scenario_id,
+        )
+
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, call), timeout=timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "interpretation_timeout request_id=%s scenario_id=%s timeout_seconds=%s",
+                request_id, scenario_id, timeout_seconds,
+            )
+            if self._on_unsafe_fallback == "raise":
+                raise InterpretationValidationError(
+                    f"LLM interpretation timed out after {timeout_seconds}s",
+                    errors=[f"timeout after {timeout_seconds}s"],
+                ) from None
+            return safe_fallback(num_notes)
 
 
 def _truncate(text: str, limit: int = 2000) -> str:

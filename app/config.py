@@ -20,6 +20,7 @@ class Settings:
     api_base_url: str | None
     max_retries: int
     log_level: str
+    llm_timeout_seconds: float
 
 
 def get_settings() -> Settings:
@@ -30,4 +31,5 @@ def get_settings() -> Settings:
         api_base_url=os.getenv("API_BASE_URL") or None,
         max_retries=int(os.getenv("MAX_RETRIES", "1")),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
+        llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "20")),
     )
