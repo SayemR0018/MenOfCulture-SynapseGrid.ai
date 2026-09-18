@@ -32,7 +32,7 @@ from optimizer.cost import peak_grid_kwh, total_cost_bdt, total_grid_kwh
 from optimizer.final_validator import replay_and_validate
 from optimizer.optimizer import OptimizerInfeasibleError, optimize_schedule
 
-logger = logging.getLogger("gridwise.app.routes")
+logger = logging.getLogger("synapsegrid.app.routes")
 
 router = APIRouter()
 

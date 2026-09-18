@@ -21,9 +21,9 @@ COPY scripts/ scripts/
 COPY docs/BUP_CSE_FEST_2026_Preli_Public_Sample_Cases.json docs/
 
 # Run as a non-root user.
-RUN useradd --create-home --uid 1000 gridwise \
-    && chown -R gridwise:gridwise /app
-USER gridwise
+RUN useradd --create-home --uid 1000 synapsegrid \
+    && chown -R synapsegrid:synapsegrid /app
+USER synapsegrid
 
 EXPOSE 8000
 

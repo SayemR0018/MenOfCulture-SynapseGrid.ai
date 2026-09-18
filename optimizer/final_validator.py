@@ -1,5 +1,5 @@
 """Final validator: replays the optimizer's output hour-by-hour to confirm
-every GridWise rule and every applied directive actually holds.
+every SynapseGrid.ai rule and every applied directive actually holds.
 
 This mirrors what the hidden judge does (Section 11) and sits at the "Final
 Validator" stage of the pipeline diagram, after the optimizer and before the

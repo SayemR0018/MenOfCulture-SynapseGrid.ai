@@ -6,20 +6,20 @@ as raw stack traces.
 """
 
 
-class GridWiseMLError(Exception):
+class SynapseGridMLError(Exception):
     """Base class for all ML-layer errors."""
 
 
-class LLMProviderError(GridWiseMLError):
+class LLMProviderError(SynapseGridMLError):
     """The configured LLM provider failed to produce a response
     (network error, API error, timeout, etc.)."""
 
 
-class LLMOutputParseError(GridWiseMLError):
+class LLMOutputParseError(SynapseGridMLError):
     """The LLM response could not be parsed as JSON at all."""
 
 
-class InterpretationValidationError(GridWiseMLError):
+class InterpretationValidationError(SynapseGridMLError):
     """The LLM output failed deterministic validation after all retries
     were exhausted."""
 

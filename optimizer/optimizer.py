@@ -4,7 +4,7 @@ This is the ONLY place that decides grid_kwh, solar_used_kwh, battery
 charge/discharge, and cost. The LLM never touches this module. Directives
 already validated by ``ml/validator.py`` are turned into per-hour arrays by
 ``optimizer/constraints.py`` and then fed into a linear program that
-minimizes total grid cost subject to the GridWise energy/battery rules
+minimizes total grid cost subject to the SynapseGrid.ai energy/battery rules
 (Section 09 of the problem statement).
 
 Variables per hour h (0..23):

@@ -1,4 +1,4 @@
-"""Prompt construction for the GridWise operator-note interpreter.
+"""Prompt construction for the SynapseGrid.ai operator-note interpreter.
 
 The prompt is assembled in the order mandated by the task brief:
 SYSTEM ROLE -> SUPPORTED DIRECTIVES -> SCHEMA -> TIME SEMANTICS ->
@@ -15,7 +15,7 @@ import json
 
 from ml.schemas import ScenarioContext
 
-SYSTEM_PROMPT = """You are the operator-note interpreter for GridWise, a campus energy \
+SYSTEM_PROMPT = """You are the operator-note interpreter for SynapseGrid.ai, a campus energy \
 optimization system. You are a LANGUAGE INTERPRETER, not an optimizer and not a \
 calculator of the final schedule.
 

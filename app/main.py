@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 
 app = FastAPI(
-    title="GridWise Smart Campus Energy Optimization",
+    title="SynapseGrid.ai — Smart Campus Energy Optimization",
     description=(
         "LLM-assisted operator directive interpretation + deterministic "
         "energy optimization for the BUP CSE FEST 2026 preliminary round."

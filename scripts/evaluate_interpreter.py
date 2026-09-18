@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluation script for the GridWise operator-note interpreter (Section 20).
+"""Evaluation script for the SynapseGrid.ai operator-note interpreter (Section 20).
 
 Runs the interpreter against a labeled case pack (by default the public
 sample cases) and reports:
@@ -209,7 +209,7 @@ def _pct(numerator: int, denominator: int) -> str:
 
 def print_report(metrics: Metrics) -> None:
     print("=" * 60)
-    print("GridWise Interpreter Evaluation")
+    print("SynapseGrid.ai Interpreter Evaluation")
     print("=" * 60)
     print(f"Total notes evaluated:            {metrics.total_notes}")
     print(

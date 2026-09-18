@@ -18,7 +18,7 @@ from ml.providers import LLMProvider
 from ml.schemas import DirectiveInterpretation, DirectiveType, ScenarioContext
 from ml.validator import ValidationResult, validate_interpretation
 
-logger = logging.getLogger("gridwise.ml.interpreter")
+logger = logging.getLogger("synapsegrid.ml.interpreter")
 
 
 def _strip_code_fences(text: str) -> str:

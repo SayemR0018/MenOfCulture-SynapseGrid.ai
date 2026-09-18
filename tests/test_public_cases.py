@@ -1,4 +1,4 @@
-"""Runs the full GridWise pipeline against the public sample case pack.
+"""Runs the full SynapseGrid.ai pipeline against the public sample case pack.
 
 Per the project instructions, public cases are used as *tests of the
 pipeline*, not as a lookup table: this file never hard-codes case IDs, note

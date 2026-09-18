@@ -1,4 +1,4 @@
-"""Pydantic schemas for the GridWise LLM interpretation layer.
+"""Pydantic schemas for the SynapseGrid.ai LLM interpretation layer.
 
 These models define the strict contract between the LLM output and the
 deterministic validator/optimizer. Nothing downstream should ever consume

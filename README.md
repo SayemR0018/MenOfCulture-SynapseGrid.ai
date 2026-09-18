@@ -1,7 +1,9 @@
-# GridWise — Smart Campus Energy Optimization Challenge
+# SynapseGrid.ai — Smart Campus Energy Optimization Challenge
 
 LLM-assisted operator directive interpretation + deterministic energy
-optimization, built for the BUP CSE FEST 2026 preliminary round.
+optimization, built for the BUP CSE FEST 2026 preliminary round
+("GridWise" is the organizers' name for this challenge track;
+SynapseGrid.ai is our submission's name for the service implementing it).
 
 Pipeline (matches the problem statement's architecture exactly):
 
@@ -50,7 +52,7 @@ optimizer/      Deterministic math layer (LLM-free)
   constraints.py    Directives + scenario -> per-hour arrays
   optimizer.py      Linear program (scipy/HiGHS) -> hourly_plan
   cost.py           total_grid_kwh / total_cost_bdt / peak_grid_kwh
-  final_validator.py  Replays hourly_plan against every GridWise rule
+  final_validator.py  Replays hourly_plan against every SynapseGrid.ai rule
 tests/          pytest suite (65+ tests)
 scripts/        scripts/evaluate_interpreter.py — accuracy metrics
 docs/           Canonical problem statement, rubric, and public sample cases
@@ -143,8 +145,8 @@ cp .env.example .env        # edit MODEL_PROVIDER / MODEL_NAME / API_KEY first
 docker compose up --build
 
 # Option B: plain docker
-docker build -t gridwise-energy-optimizer .
-docker run --rm -p 8000:8000 --env-file .env gridwise-energy-optimizer
+docker build -t synapsegrid-energy-optimizer .
+docker run --rm -p 8000:8000 --env-file .env synapsegrid-energy-optimizer
 ```
 
 Then the same `curl` calls from the section above work against
